@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useAuth } from "../auth/context";
 import { navigate } from "gatsby";
 import { Button, Card, Typography, Space, Spin, message } from "antd";
-import { GithubOutlined } from "@ant-design/icons";
+import { GithubOutlined, KeyOutlined } from "@ant-design/icons";
 import Layout from "../components/layout";
 import { graphql } from "gatsby";
 import Icon from "../components/icons";
@@ -49,7 +49,7 @@ const LoginPage = ({ data }: any) => {
 
       const popup = window.open(
         loginUrl,
-        "github-auth",
+        "auth-popup",
         `width=${width},height=${height},top=${top},left=${left}`
       );
 
@@ -86,6 +86,40 @@ const LoginPage = ({ data }: any) => {
     );
   }
 
+  const getLoginButton = () => {
+    switch (authType) {
+      case "github":
+        return (
+          <Button
+            type="primary"
+            size="large"
+            icon={<GithubOutlined />}
+            onClick={handleLogin}
+            loading={isLoggingIn}
+            block
+          >
+            {isLoggingIn ? "Connecting to GitHub..." : "Sign in with GitHub"}
+          </Button>
+        );
+      case "keycloak":
+        return (
+          <Button
+            type="primary"
+            size="large"
+            icon={<KeyOutlined />}
+            onClick={handleLogin}
+            loading={isLoggingIn}
+            block
+            style={{ backgroundColor: "#1a73e8" }}
+          >
+            {isLoggingIn ? "Connecting to Keycloak..." : "Sign in with Keycloak"}
+          </Button>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <Layout
       meta={data.site.siteMetadata}
@@ -110,16 +144,7 @@ const LoginPage = ({ data }: any) => {
           </div>
 
           <Space direction="vertical" className="w-full">
-            <Button
-              type="primary"
-              size="large"
-              icon={<GithubOutlined />}
-              onClick={handleLogin}
-              loading={isLoggingIn}
-              block
-            >
-              {isLoggingIn ? "Connecting to GitHub..." : "Sign in with GitHub"}
-            </Button>
+            {getLoginButton()}
           </Space>
         </div>
       </div>

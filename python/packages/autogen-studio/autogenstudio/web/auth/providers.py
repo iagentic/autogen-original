@@ -206,3 +206,103 @@ class FirebaseAuthProvider(AuthProvider):
         """Validate a Firebase ID token."""
         # Placeholder - would validate token with Firebase Admin SDK
         return False
+
+
+class KeycloakAuthProvider(AuthProvider):
+    """Keycloak OAuth authentication provider."""
+
+    def __init__(self, config: AuthConfig):
+        if not config.keycloak:
+            raise ConfigurationException("Keycloak auth configuration is missing")
+
+        self.config = config.keycloak
+        self.server_url = self.config.server_url.rstrip('/')  # Remove trailing slash if present
+        self.realm = self.config.realm
+        self.client_id = self.config.client_id
+        self.client_secret = self.config.client_secret
+        self.callback_url = self.config.callback_url
+        self.scopes = self.config.scopes
+
+    async def get_login_url(self) -> str:
+        """Return the Keycloak OAuth login URL."""
+        state = secrets.token_urlsafe(32)
+        params = {
+            "client_id": self.client_id,
+            "redirect_uri": self.callback_url,
+            "scope": " ".join(self.scopes),
+            "state": state,
+            "response_type": "code",
+            "response_mode": "query"
+        }
+        return f"{self.server_url}/realms/{self.realm}/protocol/openid-connect/auth?{urlencode(params)}"
+
+    async def process_callback(self, code: str, state: str | None = None) -> User:
+        """Exchange code for access token and get user info."""
+        if not code:
+            raise ProviderAuthException("keycloak", "Authorization code is missing")
+
+        # Exchange code for access token
+        token_url = f"{self.server_url}/realms/{self.realm}/protocol/openid-connect/token"
+        token_data = {
+            "client_id": self.client_id,
+            "client_secret": self.client_secret,
+            "code": code,
+            "redirect_uri": self.callback_url,
+            "grant_type": "authorization_code"
+        }
+
+        async with httpx.AsyncClient() as client:
+            # Get access token
+            token_response = await client.post(token_url, data=token_data)
+            if token_response.status_code != 200:
+                logger.error(f"Keycloak token exchange failed: {token_response.text}")
+                raise ProviderAuthException("keycloak", "Failed to exchange code for access token")
+
+            token_json = token_response.json()
+            access_token = token_json.get("access_token")
+            if not access_token:
+                logger.error(f"No access token in Keycloak response: {token_json}")
+                raise ProviderAuthException("keycloak", "No access token received")
+
+            # Get user info
+            userinfo_url = f"{self.server_url}/realms/{self.realm}/protocol/openid-connect/userinfo"
+            user_response = await client.get(
+                userinfo_url,
+                headers={"Authorization": f"Bearer {access_token}"}
+            )
+
+            if user_response.status_code != 200:
+                logger.error(f"Keycloak user info fetch failed: {user_response.text}")
+                raise ProviderAuthException("keycloak", "Failed to fetch user information")
+
+            user_data = user_response.json()
+
+            # Get user roles if available
+            roles = []
+            if "realm_access" in user_data and "roles" in user_data["realm_access"]:
+                roles = user_data["realm_access"]["roles"]
+
+            return User(
+                id=user_data.get("sub"),
+                name=user_data.get("name") or user_data.get("preferred_username"),
+                email=user_data.get("email"),
+                provider="keycloak",
+                roles=roles,
+                metadata={
+                    "preferred_username": user_data.get("preferred_username"),
+                    "access_token": access_token,
+                }
+            )
+
+    async def validate_token(self, token: str) -> bool:
+        """Validate a Keycloak access token."""
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.server_url}/realms/{self.realm}/protocol/openid-connect/userinfo",
+                    headers={"Authorization": f"Bearer {token}"}
+                )
+                return response.status_code == 200
+        except Exception as e:
+            logger.error(f"Keycloak token validation failed: {str(e)}")
+            return False

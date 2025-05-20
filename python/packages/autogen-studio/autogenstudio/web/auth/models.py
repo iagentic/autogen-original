@@ -25,13 +25,24 @@ class FirebaseAuthConfig(BaseModel):
     project_id: str
 
 
+class KeycloakAuthConfig(BaseModel):
+    """Keycloak authentication configuration."""
+    server_url: str
+    realm: str
+    client_id: str
+    client_secret: str
+    callback_url: str
+    scopes: List[str] = ["openid", "profile", "email"]
+
+
 class AuthConfig(BaseModel):
     """Authentication configuration model for the application."""
 
-    type: Literal["none", "github", "msal", "firebase"] = "none"
+    type: Literal["none", "github", "msal", "firebase", "keycloak"] = "none"
     github: Optional[GithubAuthConfig] = None
     msal: Optional[MSALAuthConfig] = None
     firebase: Optional[FirebaseAuthConfig] = None
+    keycloak: Optional[KeycloakAuthConfig] = None
     jwt_secret: Optional[str] = None
     token_expiry_minutes: int = 60
     exclude_paths: List[str] = [
@@ -69,6 +80,15 @@ class AuthConfig(BaseModel):
         values = info.data
         if values.get("type") == "firebase" and v is None:
             raise ValueError("Firebase configuration required when type is 'firebase'")
+        return v
+
+    @field_validator("keycloak")
+    @classmethod
+    def validate_keycloak_config(cls, v, info):
+        """Validate Keycloak config is present when keycloak type is selected."""
+        values = info.data
+        if values.get("type") == "keycloak" and v is None:
+            raise ValueError("Keycloak configuration required when type is 'keycloak'")
         return v
 
     @field_validator("jwt_secret")

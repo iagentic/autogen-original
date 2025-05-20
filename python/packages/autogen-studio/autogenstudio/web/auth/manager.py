@@ -10,7 +10,14 @@ from typing_extensions import Self
 
 from .exceptions import ConfigurationException, InvalidTokenException, MissingTokenException
 from .models import AuthConfig, User
-from .providers import AuthProvider, FirebaseAuthProvider, GithubAuthProvider, MSALAuthProvider, NoAuthProvider
+from .providers import (
+    AuthProvider,
+    FirebaseAuthProvider,
+    GithubAuthProvider,
+    KeycloakAuthProvider,
+    MSALAuthProvider,
+    NoAuthProvider,
+)
 
 
 class AuthManager:
@@ -34,6 +41,8 @@ class AuthManager:
                 return MSALAuthProvider(self.config)
             elif self.config.type == "firebase":
                 return FirebaseAuthProvider(self.config)
+            elif self.config.type == "keycloak":
+                return KeycloakAuthProvider(self.config)
             else:
                 return NoAuthProvider()
         except Exception as e:
@@ -144,7 +153,15 @@ class AuthManager:
                 "callback_url": os.environ.get("AUTOGENSTUDIO_GITHUB_CALLBACK_URL", ""),
                 "scopes": os.environ.get("AUTOGENSTUDIO_GITHUB_SCOPES", "user:email").split(","),
             }
-        # Add other provider config parsing here
+        elif auth_type == "keycloak":
+            config_dict["keycloak"] = {
+                "server_url": os.environ.get("AUTOGENSTUDIO_KEYCLOAK_SERVER_URL", ""),
+                "realm": os.environ.get("AUTOGENSTUDIO_KEYCLOAK_REALM", ""),
+                "client_id": os.environ.get("AUTOGENSTUDIO_KEYCLOAK_CLIENT_ID", ""),
+                "client_secret": os.environ.get("AUTOGENSTUDIO_KEYCLOAK_CLIENT_SECRET", ""),
+                "callback_url": os.environ.get("AUTOGENSTUDIO_KEYCLOAK_CALLBACK_URL", ""),
+                "scopes": os.environ.get("AUTOGENSTUDIO_KEYCLOAK_SCOPES", "openid profile email").split(","),
+            }
 
         config = AuthConfig(**config_dict)
         return cls(config)

@@ -1,0 +1,10 @@
+type: keycloak
+jwt_secret: "23fe0fe49d732999ef8d5ec42ebc3f264f9205caee6a88ddfc6274fe1b713524"
+token_expiry_minutes: 30
+keycloak:
+  server_url: "http://localhost:8080"
+  realm: "iagentic"
+  client_id: "nextjs-app"
+  client_secret: "pKrnS8wUll6vwU1v0l71VRJJMsRECPFK"
+  callback_url: "http://localhost:8081/api/auth/callback"
+  scopes: ["openid", "profile", "email"] 
